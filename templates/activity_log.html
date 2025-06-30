@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Log - OTP Pro Inventory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-clipboard-list btn-icon"></i> Activity Log</h1>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    <i class="fas fa-home btn-icon"></i> Dashboard
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">
+                    <i class="fas fa-sign-out-alt btn-icon"></i> Logout
+                </a>
+            </div>
+        </header>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="flex-between">
+                    <h3><i class="fas fa-history btn-icon"></i> System Activities</h3>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="exportActivityLog()">
+                            <i class="fas fa-download btn-icon"></i> Export
+                        </button>
+                        <button class="btn btn-danger" onclick="clearActivityLog()">
+                            <i class="fas fa-trash btn-icon"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <div class="activity-list" id="activity-log-container">
+                    <!-- Activities will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadActivityLog() {
+            try {
+                const response = await fetch('/api/activity');
+                const activities = await response.json();
+                
+                const container = document.getElementById('activity-log-container');
+                container.innerHTML = '';
+                
+                if (activities.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-info-circle"></i>
+                            <p>No activities logged yet</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                activities.reverse().forEach(activity => {
+                    const entry = document.createElement('div');
+                    entry.className = 'activity-entry';
+                    
+                    const date = new Date(activity.timestamp);
+                    const timeString = date.toLocaleTimeString();
+                    const dateString = date.toLocaleDateString();
+                    
+                    entry.innerHTML = `
+                        <div class="activity-icon">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-header">
+                                <strong>${activity.user}</strong>
+                                <span class="activity-time">${timeString} • ${dateString}</span>
+                            </div>
+                            <div class="activity-message">${activity.action}</div>
+                        </div>
+                    `;
+                    
+                    container.appendChild(entry);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('activity-log-container').innerHTML = `
+                    <div class="empty-state error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Failed to load activities</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function exportActivityLog() {
+            alert('Export functionality will be implemented soon');
+        }
+        
+        async function clearActivityLog() {
+            if (confirm('Are you sure you want to clear the activity log? This cannot be undone.')) {
+                try {
+                    const response = await fetch('/api/activity', {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        loadActivityLog();
+                        alert('Activity log cleared successfully');
+                    } else {
+                        throw new Error('Failed to clear log');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error clearing activity log: ' + error.message);
+                }
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadActivityLog);
+    </script>
+</body>
+</html>

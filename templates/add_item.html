@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory - OTP Pro Inventory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-boxes btn-icon"></i> Inventory Management</h1>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    <i class="fas fa-home btn-icon"></i> Dashboard
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">
+                    <i class="fas fa-sign-out-alt btn-icon"></i> Logout
+                </a>
+            </div>
+        </header>
+
+        <div class="toolbar">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search inventory...">
+            </div>
+            <a href="{{ url_for('add_item') }}" class="btn btn-primary">
+                <i class="fas fa-plus btn-icon"></i> Add Item
+            </a>
+        </div>
+
+        <div class="inventory-summary">
+            <span class="badge">
+                <i class="fas fa-box"></i> <span id="total-count">0</span> items
+            </span>
+            <span class="badge warning">
+                <i class="fas fa-exclamation-triangle"></i> <span id="low-count">0</span> low stock
+            </span>
+        </div>
+
+        <div id="inventory-list" class="inventory-grid"></div>
+
+        <!-- Removal Modal -->
+        <div id="removalModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-minus-circle btn-icon"></i> Remove Items</h3>
+                    <button class="btn btn-icon" onclick="closeModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Employee</label>
+                        <select id="employeeName" class="form-control" required>
+                            <option value="" disabled selected>Select Employee</option>
+                            <option>Steven</option>
+                            <option>Randy</option>
+                            <option>Inace</option>
+                            <option>Bruce</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Quantity to Remove</label>
+                        <input type="number" id="removalAmount" class="form-control" 
+                               placeholder="Enter quantity" min="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Purpose</label>
+                        <textarea id="removalPurpose" class="form-control" 
+                                  placeholder="Reason for removal" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Store</label>
+                        <select id="storeSelect" class="form-control">
+                            <option value="" disabled selected>Select Store</option>
+                            <option>NSN 00249</option>
+                            <option>NSN 02743</option>
+                            <!-- Other store options -->
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-danger" onclick="confirmRemoval()">
+                        <i class="fas fa-minus btn-icon"></i> Confirm Removal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentItemId = null;
+
+        async function loadInventory() {
+            try {
+                const response = await fetch('{{ url_for("get_inventory") }}');
+                if (!response.ok) throw new Error('Failed to load inventory');
+                const items = await response.json();
+                displayInventory(items);
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error loading inventory: ' + error.message, 'error');
+            }
+        }
+
+        function displayInventory(items) {
+            const container = document.getElementById('inventory-list');
+            container.innerHTML = '';
+            
+            let lowStockCount = 0;
+            
+            items.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'inventory-item';
+                
+                if (item.quantity < (item.threshold || 5)) {
+                    itemElement.classList.add('low-stock');
+                    lowStockCount++;
+                }
+                
+                itemElement.innerHTML = `
+                    <div class="item-header">
+                        <h3>${item.name}</h3>
+                        <span class="item-quantity ${item.quantity < (item.threshold || 5) ? 'warning' : ''}">
+                            ${item.quantity} in stock
+                        </span>
+                    </div>
+                    <div class="item-details">
+                        <p><i class="fas fa-barcode"></i> ${item.upc || 'No UPC'}</p>
+                        <p><i class="fas fa-microchip"></i> ${item.model || 'No model'}</p>
+                        <p><i class="fas fa-tag"></i> ${item.category || 'Uncategorized'}</p>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn btn-outline" onclick="openRemovalModal('${item.id}')">
+                            <i class="fas fa-minus btn-icon"></i> Remove
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(itemElement);
+            });
+            
+            document.getElementById('total-count').textContent = items.length;
+            document.getElementById('low-count').textContent = lowStockCount;
+        }
+        
+        function openRemovalModal(itemId) {
+            currentItemId = itemId;
+            document.getElementById('removalModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('removalModal').classList.remove('active');
+            currentItemId = null;
+            // Reset form
+            document.getElementById('employeeName').value = '';
+            document.getElementById('removalAmount').value = '';
+            document.getElementById('removalPurpose').value = '';
+            document.getElementById('storeSelect').value = '';
+        }
+
+        async function confirmRemoval() {
+            const employee = document.getElementById('employeeName').value;
+            const amount = parseInt(document.getElementById('removalAmount').value);
+            const purpose = document.getElementById('removalPurpose').value;
+            const store = document.getElementById('storeSelect').value;
+
+            if (!employee || !amount || !purpose || !store) {
+                showAlert('Please fill all required fields', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('{{ url_for("record_removal") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        itemId: currentItemId,
+                        amount: amount,
+                        employee: employee,
+                        purpose: purpose,
+                        store: store
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.message || 'Failed to record removal');
+                }
+
+                showAlert('Removal recorded successfully', 'success');
+                closeModal();
+                loadInventory();
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Failed to record removal: ' + error.message, 'error');
+            }
+        }
+
+        function showAlert(message, type) {
+            // Implement a nice alert notification
+            alert(message); // Replace with a proper notification system
+        }
+
+        document.addEventListener('DOMContentLoaded', loadInventory);
+    </script>
+</body>
+</html>
