@@ -1,20 +1,25 @@
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, flash
 from flask_cors import CORS
-from functools import wraps
-import json
 import os
-import uuid
-from datetime import datetime
-import logging
+import json
+from functools import wraps  # Add this import
 
-# Initialize Flask app
-app = Flask(__name__, static_folder="static", template_folder="templates")
+app = Flask(__name__)
 CORS(app)
+app.secret_key = 'your_secret_key_here'  # Make sure to set a proper secret key
 
-# Configuration
-app.secret_key = os.environ.get('SECRET_KEY') or 'dev-secret-key-here'
-app.config['DATA_FOLDER'] = os.path.join(app.instance_path, 'data')
-os.makedirs(app.config['DATA_FOLDER'], exist_ok=True)
+# Add the login_required decorator before any routes that use it
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            flash('Please log in to access this page', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Rest of your routes follow below...
+# [Keep all your existing route definitions]
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
